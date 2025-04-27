@@ -30,8 +30,37 @@ public class ServiceApplication {
                 return ServerResponse.ok().body(customerRepository.findAll());
               }
             })
+        .GET(
+            "/pattern-matching",
+            _ -> ServerResponse.ok().body(PatternMatching.getMessage(new SecureLoan("Hello word"))))
         .build();
   }
 }
 
 interface CustomerRepository extends JpaRepository<Customer, Long> {}
+
+final class PatternMatching {
+  public static String getMessage(Loan loan) {
+    return switch (loan) {
+      case UnsecureLoan _ -> "This is unsecure loan";
+      case SecureLoan sl -> sl.getMessage();
+      default -> "Unknow type";
+    };
+  }
+}
+
+sealed class Loan permits SecureLoan, UnsecureLoan {}
+
+final class SecureLoan extends Loan {
+  public SecureLoan(String message) {
+    this.message = message;
+  }
+
+  private String message;
+
+  public String getMessage() {
+    return message;
+  }
+}
+
+final class UnsecureLoan extends Loan {}
