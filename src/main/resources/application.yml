@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: spring-workshop
+  datasource:
+    url: jdbc:mysql://localhost:3307/mydatabase
+    username: myuser
+    password: secret
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.MySQL8Dialect
+    showsql: true
+    hibernate:
+      ddl-auto: none
+  sql:
+    init:
+      mode: always
+  docker:
+    compose:
+      enabled: false
