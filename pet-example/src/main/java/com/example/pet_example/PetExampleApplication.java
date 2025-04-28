@@ -1,15 +1,26 @@
 package com.example.pet_example;
 
-import jakarta.persistence.*;
-import org.springframework.boot.ApplicationRunner;
+import org.springframework.batch.core.Job;
+import org.springframework.batch.core.Step;
+import org.springframework.batch.core.job.builder.JobBuilder;
+import org.springframework.batch.core.launch.support.RunIdIncrementer;
+import org.springframework.batch.core.repository.JobRepository;
+import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.item.*;
+import org.springframework.batch.item.database.ItemPreparedStatementSetter;
+import org.springframework.batch.item.database.JdbcBatchItemWriter;
+import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
+import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
+import org.springframework.core.io.Resource;
+import org.springframework.transaction.PlatformTransactionManager;
 
-import java.util.ArrayList;
-import java.util.List;
+import javax.sql.DataSource;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 
 @SpringBootApplication
 public class PetExampleApplication {
@@ -18,128 +29,58 @@ public class PetExampleApplication {
         SpringApplication.run(PetExampleApplication.class, args);
     }
 
+    record Dog(int id, String name, String owner, String description) {
+    }
+
     @Bean
-    ApplicationRunner runner(PersonRepository repository) {
-        return args -> {
-            repository.findAll().forEach(System.out::println);
-        };
-    }
-}
-
-@Entity
-class Dog {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private int id;
-    private String name;
-    private String own;
-    private String description;
-
-    @ManyToOne
-    @JoinColumn(name = "person")
-    private Person person;
-
-    public Dog() {
+    ItemReader<Dog> dogReader(@Value("classpath:/dogs.csv") Resource resource) {
+        return new FlatFileItemReaderBuilder<Dog>()
+                .resource(resource)
+                .name("dogReader")
+                .delimited().names("person,id,name,description,dob,owner,gender,image".split(","))
+                .linesToSkip(1)
+                .fieldSetMapper(fieldSet -> new Dog(fieldSet.readInt("id"),
+                        fieldSet.readString("name"),
+                        fieldSet.readString("owner"),
+                        fieldSet.readString("description")))
+                .build();
     }
 
-    public Person getPerson() {
-        return person;
+    @Bean
+    ItemWriter<Dog> dogWriter(DataSource dataSource) {
+        return new JdbcBatchItemWriterBuilder<Dog>()
+                .dataSource(dataSource)
+                .sql("INSERT INTO dog (id, name, owner, description) VALUES (?, ?, ?, ?)")
+                .assertUpdates(true)
+                .itemPreparedStatementSetter(new ItemPreparedStatementSetter<Dog>() {
+                    @Override
+                    public void setValues(Dog item, PreparedStatement ps) throws SQLException {
+                        ps.setInt(1, item.id());
+                        ps.setString(2, item.name());
+                        ps.setString(3, item.owner());
+                        ps.setString(4, item.description());
+                    }
+                })
+                .build();
     }
 
-    public void setPerson(Person person) {
-        this.person = person;
+    @Bean
+    Step step(JobRepository repository,
+              PlatformTransactionManager transactionManager,
+              ItemReader<Dog> reader,
+              ItemWriter<Dog> writer) {
+        return new StepBuilder("step", repository)
+                .<Dog, Dog>chunk(10, transactionManager)
+                .reader(reader)
+                .writer(writer)
+                .build();
     }
 
-    public int getId() {
-        return id;
+    @Bean
+    Job job(JobRepository repository, Step step) {
+        return new JobBuilder("job", repository)
+                .incrementer(new RunIdIncrementer())
+                .start(step)
+                .build();
     }
-
-    public void setId(int id) {
-        this.id = id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getOwn() {
-        return own;
-    }
-
-    public void setOwn(String owner) {
-        this.own = owner;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    @Override
-    public String toString() {
-        return "Dog{" +
-                "id=" + id +
-                ", name='" + name + '\'' +
-                ", owner='" + own + '\'' +
-                ", description='" + description + '\'' +
-                '}';
-    }
-}
-
-@Entity
-class Person {
-
-    @Id
-    private int id;
-    private String name;
-
-    @OneToMany(mappedBy = "person", fetch = FetchType.EAGER)
-    private List<Dog> dogs = new ArrayList<>();
-
-    public Person() {
-    }
-
-    public List<Dog> getDogs() {
-        return dogs;
-    }
-
-    public void setDogs(List<Dog> dogs) {
-        this.dogs = dogs;
-    }
-
-    public int getId() {
-        return id;
-    }
-
-    public void setId(int id) {
-        this.id = id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    @Override
-    public String toString() {
-        return "Person{" +
-                "id=" + id +
-                ", name='" + name + '\'' +
-                ", dogs=" + dogs +
-                '}';
-    }
-}
-
-@Repository
-interface PersonRepository extends JpaRepository<Person, Integer> {
 }
