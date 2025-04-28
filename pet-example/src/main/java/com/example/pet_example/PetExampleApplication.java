@@ -7,8 +7,6 @@ import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.item.*;
-import org.springframework.batch.item.database.ItemPreparedStatementSetter;
-import org.springframework.batch.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,8 +17,6 @@ import org.springframework.core.io.Resource;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
 
 @SpringBootApplication
 public class PetExampleApplication {
@@ -52,14 +48,11 @@ public class PetExampleApplication {
                 .dataSource(dataSource)
                 .sql("INSERT INTO dog (id, name, owner, description) VALUES (?, ?, ?, ?)")
                 .assertUpdates(true)
-                .itemPreparedStatementSetter(new ItemPreparedStatementSetter<Dog>() {
-                    @Override
-                    public void setValues(Dog item, PreparedStatement ps) throws SQLException {
-                        ps.setInt(1, item.id());
-                        ps.setString(2, item.name());
-                        ps.setString(3, item.owner());
-                        ps.setString(4, item.description());
-                    }
+                .itemPreparedStatementSetter((item, ps) -> {
+                    ps.setInt(1, item.id());
+                    ps.setString(2, item.name());
+                    ps.setString(3, item.owner());
+                    ps.setString(4, item.description());
                 })
                 .build();
     }
