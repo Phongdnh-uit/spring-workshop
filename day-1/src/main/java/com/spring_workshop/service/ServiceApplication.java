@@ -7,6 +7,10 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.servlet.function.HandlerFunction;
 import org.springframework.web.servlet.function.RouterFunction;
 import org.springframework.web.servlet.function.ServerRequest;
@@ -64,3 +68,19 @@ final class SecureLoan extends Loan {
 }
 
 final class UnsecureLoan extends Loan {}
+
+@Controller
+@ResponseBody
+class DemoController {
+
+  private final RestClient http;
+
+  DemoController(RestClient.Builder http) {
+    this.http = http.build();
+  }
+
+  @GetMapping("/delay")
+  String delay() {
+    return this.http.get().uri("http://httpbin.org/delay/2").retrieve().body(String.class);
+  }
+}

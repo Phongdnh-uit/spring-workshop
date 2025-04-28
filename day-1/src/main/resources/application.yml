@@ -17,3 +17,11 @@ spring:
   docker:
     compose:
       enabled: false
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  tomcat:
+    threads:
+      max: 20
